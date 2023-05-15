@@ -3,21 +3,27 @@ package com.prestige;
 import javax.inject.Inject;
 
 import com.google.inject.Provides;
+import com.prestige.levelUp.LevelUpDisplayInput;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.chatbox.ChatboxPanelManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Arrays;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
@@ -33,18 +39,29 @@ public class PrestigePlugin extends Plugin {
     private static final int MAX_XP = 13034431;
 
     @Inject
+    @Getter(AccessLevel.PUBLIC)
     private Client client;
     @Inject
+    @Getter(AccessLevel.PUBLIC)
     private ClientThread clientThread;
-
+    @Inject
+    @Getter(AccessLevel.PUBLIC)
+    private ChatboxPanelManager chatboxPanelManager;
+    @Inject
+    @Getter(AccessLevel.PUBLIC)
+    private ChatMessageManager chatMessageManager;
     @Inject
     private PrestigeConfig config;
+    private LevelUpDisplayInput input;
 
     @Provides
     PrestigeConfig provideConfig(ConfigManager configManager)
     {
         return configManager.getConfig(PrestigeConfig.class);
     }
+
+    private final Map<Skill, Integer> updatedSkills = new HashMap<>();
+    private final List<Skill> levelledSkills = new ArrayList<>();
 
     @Subscribe
     public void onScriptPreFired(ScriptPreFired scriptPreFired) {
@@ -90,6 +107,30 @@ public class PrestigePlugin extends Plugin {
         }
     }
 
+    @Subscribe
+    public void onGameTick(GameTick event) {
+        if (input != null) {
+            input.closeIfTriggered();
+        }
+
+        if (levelledSkills.isEmpty() || !chatboxPanelManager.getContainerWidget().isHidden()) {
+            return;
+        }
+
+        final Skill skill = levelledSkills.remove(0);
+
+        int xp = client.getSkillExperience(skill);
+
+        // Reset the skill
+        // Set xp rate to x2
+        if (xp > HALF_XP && xp < MAX_XP) {
+            xp = (xp - HALF_XP) * 2;
+        }
+
+        input = new LevelUpDisplayInput(this, skill, Experience.getLevelForXp(xp));
+        chatboxPanelManager.openInput(input);
+    }
+
     @Override
     protected void shutDown() {
         clientThread.invoke(this::simulateSkillChange);
@@ -106,8 +147,6 @@ public class PrestigePlugin extends Plugin {
 
     @Subscribe
     public void onScriptCallbackEvent(ScriptCallbackEvent e) {
-        final int[] intStack = client.getIntStack();
-        final int intStackSize = client.getIntStackSize();
         final String[] stringStack = client.getStringStack();
         final int stringStackSize = client.getStringStackSize();
 
@@ -141,16 +180,25 @@ public class PrestigePlugin extends Plugin {
         Skill skill = statChanged.getSkill();
 
         int xp = client.getSkillExperience(skill);
+        int newLevel = 0;
 
         // Reset the skill
         // Set xp rate to x2
         if (xp > HALF_XP && xp < MAX_XP) {
             xp = (xp - HALF_XP) * 2;
 
+            newLevel = Experience.getLevelForXp(xp);
             // Set the level and xp
-            client.getRealSkillLevels()[skill.ordinal()] = Experience.getLevelForXp(xp);
+            client.getRealSkillLevels()[skill.ordinal()] = newLevel;
             client.getSkillExperiences()[skill.ordinal()] = xp;
+
+            int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : statChanged.getLevel();
+            if (oldLevel < newLevel) {
+                levelledSkills.add(skill);
+            }
         }
+
+        updatedSkills.put(skill, newLevel);
     }
 
     private void simulateSkillChange() {
