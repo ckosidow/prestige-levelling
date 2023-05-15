@@ -59,23 +59,25 @@ public class PrestigePlugin extends Plugin {
                 boolean allDoubled = true;
 
                 if (StringUtils.isNotBlank(text)) {
-                    xp = Integer.parseInt(textWidget.getText());
+                    xp = Integer.parseInt(StringUtils.trim(textWidget.getText()));
                 }
 
                 for (Widget xpDropEntry : Arrays.stream(xpdrop.getChildren()).skip(1).collect(Collectors.toList())) {
-                    int spriteId = xpDropEntry.getSpriteId();
-                    SkillData skillData = SkillData.get(spriteId);
+                    if (xpDropEntry != null) {
+                        int spriteId = xpDropEntry.getSpriteId();
+                        SkillData skillData = SkillData.get(spriteId);
 
-                    if (skillData == null) {
-                        break;
-                    }
+                        if (skillData == null) {
+                            break;
+                        }
 
-                    Skill skill = skillData.getSkill();
+                        Skill skill = skillData.getSkill();
 
-                    int currentXp = client.getSkillExperience(skill);
+                        int currentXp = client.getSkillExperience(skill);
 
-                    if (currentXp < HALF_XP || currentXp >= MAX_XP) {
-                        allDoubled = false;
+                        if (currentXp < HALF_XP || currentXp >= MAX_XP) {
+                            allDoubled = false;
+                        }
                     }
                 }
 
@@ -110,20 +112,6 @@ public class PrestigePlugin extends Plugin {
         final int stringStackSize = client.getStringStackSize();
 
         switch (e.getEventName()) {
-            case "skillTabBaseLevel":
-                final int skillId = intStack[intStackSize - 2];
-                final Skill skill = Skill.values()[skillId];
-                int exp = client.getSkillExperience(skill);
-
-                // Reset the skill
-                // Set xp rate to x2
-                if (exp > HALF_XP && exp < MAX_XP) {
-                    exp = (exp - HALF_XP) * 2;
-                }
-
-                // alter the local variable containing the level to show
-                intStack[intStackSize - 1] = Experience.getLevelForXp(exp);
-                break;
             case "skillTabTotalLevel":
                 int level = 0;
 
@@ -159,6 +147,7 @@ public class PrestigePlugin extends Plugin {
         if (xp > HALF_XP && xp < MAX_XP) {
             xp = (xp - HALF_XP) * 2;
 
+            // Set the level and xp
             client.getRealSkillLevels()[skill.ordinal()] = Experience.getLevelForXp(xp);
             client.getSkillExperiences()[skill.ordinal()] = xp;
         }
