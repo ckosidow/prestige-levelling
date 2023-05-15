@@ -69,8 +69,6 @@ public class LevelUpDisplayInput extends ChatboxInput implements KeyListener
 
     @Override
     public void open() {
-        plugin.getClientThread().invoke(this::setFireworksGraphic);
-
         final Widget chatboxContainer = plugin.getChatboxPanelManager().getContainerWidget();
 
         final String skillName = skill.getName();
@@ -84,8 +82,10 @@ public class LevelUpDisplayInput extends ChatboxInput implements KeyListener
 
         final String levelUpMessage;
         if (skillExperience >= Experience.MAX_SKILL_XP) {
+            plugin.getClientThread().invoke(() -> this.setFireworksGraphic(LevelUpFireworks.NINETY_NINE));
             levelUpMessage = "Congratulations, you just maxed your " + skillName + " skill.";
         } else {
+            plugin.getClientThread().invoke(() -> this.setFireworksGraphic(LevelUpFireworks.NORMAL));
             levelUpMessage = "Congratulations, you just advanced " + prefix + skillName + " level.";
         }
         levelUpHeader.setText(levelUpMessage);
@@ -208,13 +208,13 @@ public class LevelUpDisplayInput extends ChatboxInput implements KeyListener
         levelUpModel.revalidate();
     }
 
-    private void setFireworksGraphic() {
+    private void setFireworksGraphic(LevelUpFireworks firework) {
         final Player localPlayer = plugin.getClient().getLocalPlayer();
         if (localPlayer == null) {
             return;
         }
 
-        final int fireworksGraphic = LevelUpFireworks.NINETY_NINE.getGraphicId();
+        final int fireworksGraphic = firework.getGraphicId();
 
         if (fireworksGraphic == -1) {
             return;
