@@ -85,10 +85,10 @@ public class LevelUpDisplayInput extends ChatboxInput implements KeyListener
             levelUpMessage = "Congratulations, you just maxed your " + skillName + " skill.";
         } else {
             plugin.getClientThread().invoke(() -> this.setFireworksGraphic(LevelUpFireworks.NORMAL));
-            levelUpMessage = "Congratulations, you just advanced " + prefix + skillName + " level.";
+            levelUpMessage = "Congratulations, you just advanced " + prefix + skillName + " prestige level.";
         }
         levelUpHeader.setText(levelUpMessage);
-        levelUpHeader.setTextColor(Color.BLACK.getRGB());
+        levelUpHeader.setTextColor(Color.BLUE.getRGB());
         levelUpHeader.setFontId(FontID.QUILL_8);
         levelUpHeader.setXPositionMode(WidgetPositionMode.ABSOLUTE_TOP);
         levelUpHeader.setOriginalX(73 + X_OFFSET);
@@ -106,8 +106,8 @@ public class LevelUpDisplayInput extends ChatboxInput implements KeyListener
             levelUpTextMessage = "You have reached maximum experience in " + skillName;
         } else {
             levelUpTextMessage = (skill == Skill.HITPOINTS
-                    ? "Your Hitpoints are now " + level
-                    : "Your " + skillName + " level is now " + level)
+                    ? "Your Hitpoints prestige is now " + level
+                    : "Your " + skillName + " prestige level is now " + level)
                     + '.';
         }
         levelUpText.setText(levelUpTextMessage);

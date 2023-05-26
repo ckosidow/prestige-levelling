@@ -35,8 +35,8 @@ import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
 )
 public class PrestigePlugin extends Plugin {
     private static final String TOTAL_LEVEL_TEXT_PREFIX = "Total level:<br>";
-    private static final int HALF_XP = 6517253;
     private static final int MAX_XP = 13034431;
+    private static final int HALF_XP = MAX_XP / 2;
 
     @Inject
     @Getter(AccessLevel.PUBLIC)
@@ -92,7 +92,7 @@ public class PrestigePlugin extends Plugin {
 
                         int currentXp = client.getSkillExperience(skill);
 
-                        if (currentXp < HALF_XP || currentXp >= MAX_XP) {
+                        if (!isPrestiged(currentXp)) {
                             allDoubled = false;
                         }
                     }
@@ -123,8 +123,8 @@ public class PrestigePlugin extends Plugin {
 
         // Reset the skill
         // Set xp rate to x2
-        if (xp > HALF_XP && xp < MAX_XP) {
-            xp = (xp - HALF_XP) * 2;
+        if (isPrestiged(xp)) {
+            xp = prestigeXP(xp);
         }
 
         input = new LevelUpDisplayInput(this, skill, Experience.getLevelForXp(xp));
@@ -163,8 +163,10 @@ public class PrestigePlugin extends Plugin {
 
                     // Reset the skill
                     // Set xp rate to x2
-                    if (xp > HALF_XP && xp < MAX_XP) {
-                        xp = (xp - HALF_XP) * 2;
+                    if (isPrestiged(xp)) {
+                        if (isPrestigeLevelCloser(xp)) {
+                            xp = (xp - HALF_XP) * 2;
+                        }
                     }
 
                     level += Experience.getLevelForXp(xp);
@@ -180,25 +182,48 @@ public class PrestigePlugin extends Plugin {
         Skill skill = statChanged.getSkill();
 
         int xp = client.getSkillExperience(skill);
-        int newLevel = 0;
+        int level = statChanged.getLevel();
+        int newLevel = 1;
 
         // Reset the skill
         // Set xp rate to x2
-        if (xp > HALF_XP && xp < MAX_XP) {
-            xp = (xp - HALF_XP) * 2;
+        if (isPrestiged(xp)) {
+            int prestigeXp = prestigeXP(xp);
 
-            newLevel = Experience.getLevelForXp(xp);
-            // Set the level and xp
-            client.getRealSkillLevels()[skill.ordinal()] = newLevel;
-            client.getSkillExperiences()[skill.ordinal()] = xp;
+            if (isPrestigeLevelCloser(xp)) {
+                newLevel = Experience.getLevelForXp(prestigeXp);
+                // Set the prestige level and xp
+                client.getRealSkillLevels()[skill.ordinal()] = newLevel;
+                client.getSkillExperiences()[skill.ordinal()] = prestigeXp;
 
-            int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : statChanged.getLevel();
-            if (oldLevel < newLevel) {
-                levelledSkills.add(skill);
+                int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : level;
+
+                if (oldLevel < newLevel) {
+                    levelledSkills.add(skill);
+                }
+
+                updatedSkills.put(skill, newLevel);
             }
         }
+    }
 
-        updatedSkills.put(skill, newLevel);
+    // Determines if the player's level is between 92 and 99, and is therefore prestiged
+    private boolean isPrestiged(int xp) {
+        return xp > HALF_XP && xp < MAX_XP;
+    }
+
+    // Determines if the player's real skill level is closer to levelling up than their prestige level
+    private boolean isPrestigeLevelCloser(int xp) {
+        int prestigeXp = prestigeXP(xp);
+        int level = Experience.getLevelForXp(xp);
+        int remaining = Experience.getXpForLevel(level + 1) - xp;
+        int prestigeRemaining = Experience.getXpForLevel(Experience.getLevelForXp(prestigeXp) + 1) - prestigeXp;
+
+        return (prestigeRemaining / 2) < remaining;
+    }
+
+    private int prestigeXP(int xp) {
+        return (xp - HALF_XP) * 2;
     }
 
     private void simulateSkillChange() {
