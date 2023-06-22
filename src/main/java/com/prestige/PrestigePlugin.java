@@ -31,12 +31,14 @@ import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
 @Slf4j
 @PluginDescriptor(
         name = "Prestige",
-        description = "Resets xp to 0 and doubles xp rate between levels 92 and 99"
+        description = "Resets xp to 0 and doubles xp rate between levels 92 and 99",
+        tags = {"levelling", "reset", "99", "92"}
 )
 public class PrestigePlugin extends Plugin {
     private static final String TOTAL_LEVEL_TEXT_PREFIX = "Total level:<br>";
     private static final int MAX_XP = 13034431;
     private static final int HALF_XP = MAX_XP / 2;
+    private static final List<Skill> COMBAT_SKILLS = Arrays.asList(Skill.ATTACK, Skill.DEFENCE, Skill.STRENGTH, Skill.MAGIC, Skill.RANGED);
 
     @Inject
     @Getter(AccessLevel.PUBLIC)
@@ -76,7 +78,7 @@ public class PrestigePlugin extends Plugin {
                 boolean allDoubled = true;
 
                 if (StringUtils.isNotBlank(text)) {
-                    xp = Integer.parseInt(StringUtils.trim(textWidget.getText()));
+                    xp = Integer.parseInt(StringUtils.trim(textWidget.getText().replaceAll(",", "")));
                 }
 
                 for (Widget xpDropEntry : Arrays.stream(xpdrop.getChildren()).skip(1).collect(Collectors.toList())) {
@@ -138,7 +140,7 @@ public class PrestigePlugin extends Plugin {
 
     @Subscribe
     public void onConfigChanged(ConfigChanged configChanged) {
-        if (!configChanged.getGroup().equals("Prestige")) {
+        if (!configChanged.getGroup().equals("prestige")) {
             return;
         }
 
@@ -164,7 +166,7 @@ public class PrestigePlugin extends Plugin {
                     // Reset the skill
                     // Set xp rate to x2
                     if (isPrestiged(xp)) {
-                        if (isPrestigeLevelCloser(xp)) {
+                        if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
                             xp = (xp - HALF_XP) * 2;
                         }
                     }
@@ -180,23 +182,41 @@ public class PrestigePlugin extends Plugin {
     @Subscribe
     public void onStatChanged(StatChanged statChanged) {
         Skill skill = statChanged.getSkill();
-
         int xp = client.getSkillExperience(skill);
-        int level = statChanged.getLevel();
-        int newLevel = 1;
+
+        if (COMBAT_SKILLS.contains(skill)) {
+            // Player doesn't want to show prestige for combat skills
+            if (!config.enableCombat()) {
+                return;
+            }
+        } else if (Skill.HITPOINTS == skill) {
+            // Player doesn't want to show prestige for HP
+            if (!config.enableHP()) {
+                return;
+            }
+        } else if (Skill.PRAYER == skill) {
+            // Player doesn't want to show prestige for Prayer
+            if (!config.enablePrayer()) {
+                return;
+            }
+        } else {
+            // Player doesn't want to show prestige for non-combat skills
+            if (!config.enableNonCombat()) {
+                return;
+            }
+        }
 
         // Reset the skill
         // Set xp rate to x2
         if (isPrestiged(xp)) {
-            int prestigeXp = prestigeXP(xp);
-
-            if (isPrestigeLevelCloser(xp)) {
-                newLevel = Experience.getLevelForXp(prestigeXp);
+            if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
+                int prestigeXp = prestigeXP(xp);
+                int newLevel = Experience.getLevelForXp(prestigeXp);
                 // Set the prestige level and xp
                 client.getRealSkillLevels()[skill.ordinal()] = newLevel;
                 client.getSkillExperiences()[skill.ordinal()] = prestigeXp;
 
-                int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : level;
+                int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : statChanged.getLevel();
 
                 if (oldLevel < newLevel) {
                     levelledSkills.add(skill);
