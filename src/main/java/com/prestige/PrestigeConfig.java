@@ -3,6 +3,7 @@ package com.prestige;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
 @ConfigGroup("prestige")
 public interface PrestigeConfig extends Config {
@@ -16,11 +17,22 @@ public interface PrestigeConfig extends Config {
         return false;
     }
 
+    @Range(max = 126, min = 1)
+    @ConfigItem(
+            keyName = "goalLevel",
+            name = "Goal Level",
+            description = "Max level you're trying to achieve - Half of this will be the level at which you prestige",
+            position = 2
+    )
+    default int goalLevel() {
+        return 99;
+    }
+
     @ConfigItem(
             keyName = "enableHP",
             name = "Enable HP Prestige",
             description = "Enables prestige levels for HP NOTE: This may not work well with boosts or HP tracking",
-            position = 2
+            position = 3
     )
     default boolean enableHP() {
         return false;
@@ -30,7 +42,7 @@ public interface PrestigeConfig extends Config {
             keyName = "enablePrayer",
             name = "Enable Prayer Prestige",
             description = "Enables prestige levels for Prayer  NOTE: This may not work well with boosts or prayer tracking",
-            position = 3
+            position = 4
     )
     default boolean enablePrayer() {
         return false;
@@ -40,7 +52,7 @@ public interface PrestigeConfig extends Config {
             keyName = "enableCombat",
             name = "Enable Combat Prestige",
             description = "Enables prestige levels for combat skills (Attack, Strength, Defense, Ranged, Magic) NOTE: This may not work well with boosts",
-            position = 4
+            position = 5
     )
     default boolean enableCombat() {
         return true;
@@ -50,7 +62,7 @@ public interface PrestigeConfig extends Config {
             keyName = "enableNonCombat",
             name = "Enable Non-Combat Prestige",
             description = "Enables prestige levels for non-combat skills",
-            position = 5
+            position = 6
     )
     default boolean enableNonCombat() {
         return true;

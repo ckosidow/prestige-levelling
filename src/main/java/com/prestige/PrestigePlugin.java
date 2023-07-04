@@ -36,9 +36,17 @@ import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
 )
 public class PrestigePlugin extends Plugin {
     private static final String TOTAL_LEVEL_TEXT_PREFIX = "Total level:<br>";
-    private static final int MAX_XP = 13034431;
-    private static final int HALF_XP = MAX_XP / 2;
+    private static final int XP_MODIFIER = 2;
+    private int maxXp = Experience.getXpForLevel(99);
+    private int halfXp = maxXp / XP_MODIFIER;
     private static final List<Skill> COMBAT_SKILLS = Arrays.asList(Skill.ATTACK, Skill.DEFENCE, Skill.STRENGTH, Skill.MAGIC, Skill.RANGED);
+    private static final Map<Skill, Integer> ACTUAL_SKILL_XP = new HashMap<>();
+
+    static {
+        for (Skill skill : Skill.values()) {
+            ACTUAL_SKILL_XP.put(skill, 0);
+        }
+    }
 
     @Inject
     @Getter(AccessLevel.PUBLIC)
@@ -57,8 +65,7 @@ public class PrestigePlugin extends Plugin {
     private LevelUpDisplayInput input;
 
     @Provides
-    PrestigeConfig provideConfig(ConfigManager configManager)
-    {
+    PrestigeConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(PrestigeConfig.class);
     }
 
@@ -101,7 +108,7 @@ public class PrestigePlugin extends Plugin {
                 }
 
                 if (allDoubled) {
-                    textWidget.setText(" " + xp * 2);
+                    textWidget.setText(" " + xp * XP_MODIFIER);
                     textWidget.revalidate();
                     xpdrop.revalidate();
                 }
@@ -124,7 +131,7 @@ public class PrestigePlugin extends Plugin {
         int xp = client.getSkillExperience(skill);
 
         // Reset the skill
-        // Set xp rate to x2
+        // Set xp rate to the xp modifier
         if (isPrestiged(xp)) {
             xp = prestigeXP(xp);
         }
@@ -136,6 +143,8 @@ public class PrestigePlugin extends Plugin {
     @Override
     protected void shutDown() {
         clientThread.invoke(this::simulateSkillChange);
+
+        this.resetSkills();
     }
 
     @Subscribe
@@ -143,6 +152,10 @@ public class PrestigePlugin extends Plugin {
         if (!configChanged.getGroup().equals("prestige")) {
             return;
         }
+
+        this.calculatePrestigeRange();
+        this.resetSkills();
+        this.updateAllStats();
 
         clientThread.invoke(this::simulateSkillChange);
     }
@@ -164,10 +177,10 @@ public class PrestigePlugin extends Plugin {
                     int xp = client.getSkillExperience(s);
 
                     // Reset the skill
-                    // Set xp rate to x2
+                    // Set xp rate to the xp modifier
                     if (isPrestiged(xp)) {
                         if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
-                            xp = (xp - HALF_XP) * 2;
+                            xp = (xp - halfXp) * XP_MODIFIER;
                         }
                     }
 
@@ -179,10 +192,40 @@ public class PrestigePlugin extends Plugin {
         }
     }
 
+    @Override
+    protected void startUp() {
+        this.calculatePrestigeRange();
+
+        this.updateAllStats();
+    }
+
+    private void updateAllStats() {
+        for (Skill skill : Skill.values()) {
+            changeStat(skill, client.getRealSkillLevel(skill), true);
+            client.queueChangedSkill(skill);
+        }
+    }
+
     @Subscribe
     public void onStatChanged(StatChanged statChanged) {
-        Skill skill = statChanged.getSkill();
+        this.changeStat(statChanged.getSkill(), statChanged.getLevel(), false);
+    }
+
+    private void resetSkills() {
+        for (Skill skill : Skill.values()) {
+            int xp = ACTUAL_SKILL_XP.get(skill);
+
+            client.getRealSkillLevels()[skill.ordinal()] = Experience.getLevelForXp(xp);
+            client.getSkillExperiences()[skill.ordinal()] = xp;
+
+            client.queueChangedSkill(skill);
+        }
+    }
+
+    private void changeStat(Skill skill, int level, boolean ignoreLevels) {
         int xp = client.getSkillExperience(skill);
+
+        ACTUAL_SKILL_XP.put(skill, xp);
 
         if (COMBAT_SKILLS.contains(skill)) {
             // Player doesn't want to show prestige for combat skills
@@ -207,7 +250,7 @@ public class PrestigePlugin extends Plugin {
         }
 
         // Reset the skill
-        // Set xp rate to x2
+        // Set xp rate to the xp modifier
         if (isPrestiged(xp)) {
             if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
                 int prestigeXp = prestigeXP(xp);
@@ -216,9 +259,9 @@ public class PrestigePlugin extends Plugin {
                 client.getRealSkillLevels()[skill.ordinal()] = newLevel;
                 client.getSkillExperiences()[skill.ordinal()] = prestigeXp;
 
-                int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : statChanged.getLevel();
+                int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : level;
 
-                if (oldLevel < newLevel) {
+                if (!ignoreLevels && oldLevel < newLevel) {
                     levelledSkills.add(skill);
                 }
 
@@ -229,7 +272,7 @@ public class PrestigePlugin extends Plugin {
 
     // Determines if the player's level is between 92 and 99, and is therefore prestiged
     private boolean isPrestiged(int xp) {
-        return xp > HALF_XP && xp < MAX_XP;
+        return xp > halfXp && xp < maxXp;
     }
 
     // Determines if the player's real skill level is closer to levelling up than their prestige level
@@ -239,11 +282,16 @@ public class PrestigePlugin extends Plugin {
         int remaining = Experience.getXpForLevel(level + 1) - xp;
         int prestigeRemaining = Experience.getXpForLevel(Experience.getLevelForXp(prestigeXp) + 1) - prestigeXp;
 
-        return (prestigeRemaining / 2) < remaining;
+        return (prestigeRemaining / XP_MODIFIER) < remaining;
     }
 
     private int prestigeXP(int xp) {
-        return (xp - HALF_XP) * 2;
+        return (xp - halfXp) * XP_MODIFIER;
+    }
+
+    private void calculatePrestigeRange() {
+        maxXp = Experience.getXpForLevel(config.goalLevel());
+        halfXp = maxXp / XP_MODIFIER;
     }
 
     private void simulateSkillChange() {
