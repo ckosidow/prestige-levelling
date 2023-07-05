@@ -41,10 +41,14 @@ public class PrestigePlugin extends Plugin {
     private int prestigeXP = maxXp - (maxXp / xpFactor);
     private static final List<Skill> COMBAT_SKILLS = Arrays.asList(Skill.ATTACK, Skill.DEFENCE, Skill.STRENGTH, Skill.MAGIC, Skill.RANGED);
     private static final Map<Skill, Integer> ACTUAL_SKILL_XP = new HashMap<>();
+    private static final Map<Skill, Integer> ACTUAL_SKILL_BOOST = new HashMap<>();
 
     static {
         for (Skill skill : Skill.values()) {
-            ACTUAL_SKILL_XP.put(skill, 0);
+            if (skill != Skill.OVERALL) {
+                ACTUAL_SKILL_XP.put(skill, 0);
+                ACTUAL_SKILL_BOOST.put(skill, 0);
+            }
         }
     }
 
@@ -142,8 +146,6 @@ public class PrestigePlugin extends Plugin {
 
     @Override
     protected void shutDown() {
-        clientThread.invoke(this::simulateSkillChange);
-
         this.resetSkills();
     }
 
@@ -156,8 +158,6 @@ public class PrestigePlugin extends Plugin {
         this.calculatePrestigeRange();
         this.resetSkills();
         this.updateAllStats();
-
-        clientThread.invoke(this::simulateSkillChange);
     }
 
     @Subscribe
@@ -174,7 +174,7 @@ public class PrestigePlugin extends Plugin {
                         continue;
                     }
 
-                    int xp = client.getSkillExperience(s);
+                    int xp = ACTUAL_SKILL_XP.get(s);
 
                     // Reset the skill
                     // Set xp rate to the xp modifier
@@ -201,31 +201,37 @@ public class PrestigePlugin extends Plugin {
 
     private void updateAllStats() {
         for (Skill skill : Skill.values()) {
-            changeStat(skill, client.getRealSkillLevel(skill), true);
-            client.queueChangedSkill(skill);
+            if (skill != Skill.OVERALL) {
+                changeStat(skill, client.getRealSkillLevel(skill), ACTUAL_SKILL_BOOST.get(skill), true);
+                client.queueChangedSkill(skill);
+            }
         }
     }
 
     @Subscribe
     public void onStatChanged(StatChanged statChanged) {
-        this.changeStat(statChanged.getSkill(), statChanged.getLevel(), false);
+        this.changeStat(statChanged.getSkill(), statChanged.getLevel(), statChanged.getBoostedLevel(), false);
     }
 
     private void resetSkills() {
         for (Skill skill : Skill.values()) {
-            int xp = ACTUAL_SKILL_XP.get(skill);
+            if (skill != Skill.OVERALL) {
+                int xp = ACTUAL_SKILL_XP.get(skill);
 
-            client.getRealSkillLevels()[skill.ordinal()] = Experience.getLevelForXp(xp);
-            client.getSkillExperiences()[skill.ordinal()] = xp;
+                client.getRealSkillLevels()[skill.ordinal()] = Experience.getLevelForXp(xp);
+                client.getSkillExperiences()[skill.ordinal()] = xp;
+                client.getBoostedSkillLevels()[skill.ordinal()] = ACTUAL_SKILL_BOOST.get(skill);
 
-            client.queueChangedSkill(skill);
+                client.queueChangedSkill(skill);
+            }
         }
     }
 
-    private void changeStat(Skill skill, int level, boolean ignoreLevels) {
+    private void changeStat(Skill skill, int level, int boostedLevel, boolean ignoreLevels) {
         int xp = client.getSkillExperience(skill);
 
         ACTUAL_SKILL_XP.put(skill, xp);
+        ACTUAL_SKILL_BOOST.put(skill, boostedLevel);
 
         if (COMBAT_SKILLS.contains(skill)) {
             // Player doesn't want to show prestige for combat skills
@@ -255,9 +261,12 @@ public class PrestigePlugin extends Plugin {
             if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
                 int prestigeXp = prestigeXP(xp);
                 int newLevel = Experience.getLevelForXp(prestigeXp);
+                int boostDiff = boostedLevel - Experience.getLevelForXp(ACTUAL_SKILL_XP.get(skill));
+
                 // Set the prestige level and xp
                 client.getRealSkillLevels()[skill.ordinal()] = newLevel;
                 client.getSkillExperiences()[skill.ordinal()] = prestigeXp;
+                client.getBoostedSkillLevels()[skill.ordinal()] = newLevel + boostDiff;
 
                 int oldLevel = updatedSkills.get(skill) != null ? updatedSkills.get(skill) : level;
 
@@ -293,14 +302,5 @@ public class PrestigePlugin extends Plugin {
         xpFactor = config.xpFactor();
         maxXp = Experience.getXpForLevel(config.goalLevel());
         prestigeXP = maxXp - (maxXp / xpFactor);
-    }
-
-    private void simulateSkillChange() {
-        // this fires widgets listening for all skill changes
-        for (Skill skill : Skill.values()) {
-            if (skill != Skill.OVERALL) {
-                client.queueChangedSkill(skill);
-            }
-        }
     }
 }
