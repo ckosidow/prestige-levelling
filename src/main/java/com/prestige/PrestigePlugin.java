@@ -36,9 +36,9 @@ import static net.runelite.api.ScriptID.XPDROPS_SETDROPSIZE;
 )
 public class PrestigePlugin extends Plugin {
     private static final String TOTAL_LEVEL_TEXT_PREFIX = "Total level:<br>";
-    private static final int XP_MODIFIER = 2;
+    private int xpFactor = 2;
     private int maxXp = Experience.getXpForLevel(99);
-    private int halfXp = maxXp / XP_MODIFIER;
+    private int prestigeXP = maxXp - (maxXp / xpFactor);
     private static final List<Skill> COMBAT_SKILLS = Arrays.asList(Skill.ATTACK, Skill.DEFENCE, Skill.STRENGTH, Skill.MAGIC, Skill.RANGED);
     private static final Map<Skill, Integer> ACTUAL_SKILL_XP = new HashMap<>();
 
@@ -108,7 +108,7 @@ public class PrestigePlugin extends Plugin {
                 }
 
                 if (allDoubled) {
-                    textWidget.setText(" " + xp * XP_MODIFIER);
+                    textWidget.setText(" " + xp * xpFactor);
                     textWidget.revalidate();
                     xpdrop.revalidate();
                 }
@@ -180,7 +180,7 @@ public class PrestigePlugin extends Plugin {
                     // Set xp rate to the xp modifier
                     if (isPrestiged(xp)) {
                         if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
-                            xp = (xp - halfXp) * XP_MODIFIER;
+                            xp = (xp - prestigeXP) * xpFactor;
                         }
                     }
 
@@ -272,7 +272,7 @@ public class PrestigePlugin extends Plugin {
 
     // Determines if the player's level is between 92 and 99, and is therefore prestiged
     private boolean isPrestiged(int xp) {
-        return xp > halfXp && xp < maxXp;
+        return xp > prestigeXP && xp < maxXp;
     }
 
     // Determines if the player's real skill level is closer to levelling up than their prestige level
@@ -282,16 +282,17 @@ public class PrestigePlugin extends Plugin {
         int remaining = Experience.getXpForLevel(level + 1) - xp;
         int prestigeRemaining = Experience.getXpForLevel(Experience.getLevelForXp(prestigeXp) + 1) - prestigeXp;
 
-        return (prestigeRemaining / XP_MODIFIER) < remaining;
+        return (prestigeRemaining / xpFactor) < remaining;
     }
 
     private int prestigeXP(int xp) {
-        return (xp - halfXp) * XP_MODIFIER;
+        return (xp - prestigeXP) * xpFactor;
     }
 
     private void calculatePrestigeRange() {
+        xpFactor = config.xpFactor();
         maxXp = Experience.getXpForLevel(config.goalLevel());
-        halfXp = maxXp / XP_MODIFIER;
+        prestigeXP = maxXp - (maxXp / xpFactor);
     }
 
     private void simulateSkillChange() {

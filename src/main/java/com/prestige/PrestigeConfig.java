@@ -28,11 +28,22 @@ public interface PrestigeConfig extends Config {
         return 99;
     }
 
+    @Range(max = 100, min = 2)
+    @ConfigItem(
+            keyName = "xpFactor",
+            name = "XP Factor",
+            description = "The rate at which xp is multiplied. Prestige when you have (1 / XP Factor) remaining. XP Factor of 2 means you prestige at half (1/2) xp remaining, for example.",
+            position = 3
+    )
+    default int xpFactor() {
+        return 2;
+    }
+
     @ConfigItem(
             keyName = "enableHP",
             name = "Enable HP Prestige",
             description = "Enables prestige levels for HP NOTE: This may not work well with boosts or HP tracking",
-            position = 3
+            position = 4
     )
     default boolean enableHP() {
         return false;
@@ -42,7 +53,7 @@ public interface PrestigeConfig extends Config {
             keyName = "enablePrayer",
             name = "Enable Prayer Prestige",
             description = "Enables prestige levels for Prayer  NOTE: This may not work well with boosts or prayer tracking",
-            position = 4
+            position = 5
     )
     default boolean enablePrayer() {
         return false;
@@ -52,7 +63,7 @@ public interface PrestigeConfig extends Config {
             keyName = "enableCombat",
             name = "Enable Combat Prestige",
             description = "Enables prestige levels for combat skills (Attack, Strength, Defense, Ranged, Magic) NOTE: This may not work well with boosts",
-            position = 5
+            position = 6
     )
     default boolean enableCombat() {
         return true;
@@ -62,7 +73,7 @@ public interface PrestigeConfig extends Config {
             keyName = "enableNonCombat",
             name = "Enable Non-Combat Prestige",
             description = "Enables prestige levels for non-combat skills",
-            position = 6
+            position = 7
     )
     default boolean enableNonCombat() {
         return true;
