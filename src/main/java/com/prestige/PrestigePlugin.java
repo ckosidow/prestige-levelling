@@ -174,17 +174,7 @@ public class PrestigePlugin extends Plugin {
                         continue;
                     }
 
-                    int xp = ACTUAL_SKILL_XP.get(s);
-
-                    // Reset the skill
-                    // Set xp rate to the xp modifier
-                    if (isPrestiged(xp)) {
-                        if (!config.showRealLevels() || isPrestigeLevelCloser(xp)) {
-                            xp = (xp - prestigeXP) * xpFactor;
-                        }
-                    }
-
-                    level += Experience.getLevelForXp(xp);
+                    level += Experience.getLevelForXp(client.getSkillExperience(s));
                 }
 
                 stringStack[stringStackSize - 1] = TOTAL_LEVEL_TEXT_PREFIX + level;
