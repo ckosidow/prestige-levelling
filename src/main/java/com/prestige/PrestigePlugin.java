@@ -43,15 +43,6 @@ public class PrestigePlugin extends Plugin {
     private static final Map<Skill, Integer> ACTUAL_SKILL_XP = new HashMap<>();
     private static final Map<Skill, Integer> ACTUAL_SKILL_BOOST = new HashMap<>();
 
-    static {
-        for (Skill skill : Skill.values()) {
-            if (skill != Skill.OVERALL) {
-                ACTUAL_SKILL_XP.put(skill, 0);
-                ACTUAL_SKILL_BOOST.put(skill, 0);
-            }
-        }
-    }
-
     @Inject
     @Getter(AccessLevel.PUBLIC)
     private Client client;
@@ -75,50 +66,6 @@ public class PrestigePlugin extends Plugin {
 
     private final Map<Skill, Integer> updatedSkills = new HashMap<>();
     private final List<Skill> levelledSkills = new ArrayList<>();
-
-    @Subscribe
-    public void onScriptPreFired(ScriptPreFired scriptPreFired) {
-        if (scriptPreFired.getScriptId() == XPDROPS_SETDROPSIZE) {
-            final int[] intStack = client.getIntStack();
-            final Widget xpdrop = client.getWidget(intStack[0]);
-
-            if (xpdrop != null && xpdrop.getChildren() != null) {
-                Widget textWidget = xpdrop.getChild(0);
-                String text = textWidget.getText();
-                int xp = 0;
-                boolean allDoubled = true;
-
-                if (StringUtils.isNotBlank(text)) {
-                    xp = Integer.parseInt(StringUtils.trim(textWidget.getText().replaceAll(",", "")));
-                }
-
-                for (Widget xpDropEntry : Arrays.stream(xpdrop.getChildren()).skip(1).collect(Collectors.toList())) {
-                    if (xpDropEntry != null) {
-                        int spriteId = xpDropEntry.getSpriteId();
-                        SkillData skillData = SkillData.get(spriteId);
-
-                        if (skillData == null) {
-                            break;
-                        }
-
-                        Skill skill = skillData.getSkill();
-
-                        int currentXp = client.getSkillExperience(skill);
-
-                        if (!isPrestiged(currentXp)) {
-                            allDoubled = false;
-                        }
-                    }
-                }
-
-                if (allDoubled) {
-                    textWidget.setText(" " + xp * xpFactor);
-                    textWidget.revalidate();
-                    xpdrop.revalidate();
-                }
-            }
-        }
-    }
 
     @Subscribe
     public void onGameTick(GameTick event) {
@@ -184,6 +131,13 @@ public class PrestigePlugin extends Plugin {
 
     @Override
     protected void startUp() {
+        for (Skill skill : Skill.values()) {
+            if (skill != Skill.OVERALL) {
+                ACTUAL_SKILL_XP.put(skill, client.getSkillExperience(skill));
+                ACTUAL_SKILL_BOOST.put(skill, client.getBoostedSkillLevel(skill));
+            }
+        }
+
         this.calculatePrestigeRange();
 
         this.updateAllStats();
